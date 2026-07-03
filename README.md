@@ -1,112 +1,59 @@
-# Urban Risk Intelligence System (URIS)
+# URIS — Urban Risk Intelligence System
 
-Safety-aware route planning for urban commuters. Compare fastest vs safest routes with numeric risk scores, heatmap visualization, and incident reporting.
+An AI-powered navigation platform that recommends safer city routes using
+dynamic risk assessment — built as a solo full-stack portfolio project.
 
-**Live demo:** [urban-route-intelligence-system.vercel.app](https://urban-route-intelligence-system.vercel.app)
+**Live demo:** [your-vercel-url.vercel.app](https://your-vercel-url.vercel.app)
+
+## What It Does
+- Generates Fastest and Safest route alternatives between any two points in Delhi NCR
+- Scores routes using a pre-trained Random Forest model (R² = 0.93, MAE = 4.5 pts)
+- Visualizes risk as a color-coded H3 hexagonal heatmap
+- Adjusts risk scores in real time based on current weather conditions
+- Tracks live location during navigation and warns when entering high-risk zones
+- Accepts user incident reports that immediately update the risk heatmap
 
 ## Stack
+Frontend: React + Mapbox GL JS · Backend: Node.js + Express
+Database: PostgreSQL + PostGIS · ML: Python + scikit-learn (Random Forest)
+Deploy: Vercel (client) + Render (server + DB)
 
-- **Frontend:** React + Vite, Mapbox GL JS (Vercel)
-- **Backend:** Node.js + Express (Render)
-- **Database:** PostgreSQL + PostGIS
-- **ML:** Python scikit-learn Random Forest (Phase 2)
-
-## Project Structure
-
-```
-uris/
-├── client/              # React + Vite frontend
-├── server/              # Node.js + Express API
-├── .github/workflows/   # CI
-└── README.md
-```
-
-## Local Development
-
-### Prerequisites
-
-- Node.js 20+
-- PostgreSQL with PostGIS (or Render-hosted DB)
-
-### Backend
-
+## Local Setup
 ```bash
-cd server
-cp .env.example .env   # fill in values — never commit this file
-npm install
-npm run dev            # http://localhost:3001
+# Backend
+cd server && npm install
+cp .env.example .env   # fill in your keys
+npm run dev
+
+# Frontend
+cd client && npm install
+cp .env.local.example .env.local   # fill in VITE_MAPBOX_PUBLIC_TOKEN
+npm run dev
+
+# ML pipeline (first-time setup only)
+cd ml
+python -m venv venv && venv/Scripts/activate
+pip install h3==3.7.6 --only-binary=:all:
+pip install -r requirements.txt
+python generate_data.py
+python train_model.py
+python compute_grid.py
+python seed_db.py
 ```
 
-### Frontend
+## Data Methodology
+Incident data is synthetic — see [ml/DATA_METHODOLOGY.md](ml/DATA_METHODOLOGY.md)
+for full explanation of what the model does and does not represent.
 
-```bash
-cd client
-cp .env.local.example .env.local   # fill in values — never commit this file
-npm install
-npm run dev            # http://localhost:5180
+## Architecture
 ```
-
-URIS uses port **5180** by default so it does not conflict with other Vite apps on 5173.
-
-### Database Migration
-
-```bash
-cd server
-node run-migration.js
+React + Mapbox GL JS
+        ↓ HTTPS/REST
+Node.js + Express
+   ↓              ↓
+Mapbox        OpenWeatherMap
+Directions        (real)
+   ↓
+PostgreSQL + PostGIS
+(H3 risk grid — precomputed by Random Forest)
 ```
-
-Or: `psql "$DATABASE_URL" -f server/db/migrations/001_initial.sql`
-
-## Deployment
-
-### Render (backend + Postgres)
-
-1. Create a PostgreSQL instance on Render; copy **External Database URL**.
-2. Create a **Web Service** from this repo:
-   - Root directory: `server`
-   - Build: `npm install`
-   - Start: `node server.js`
-3. Set environment variables in the Render dashboard (not in code):
-   - `DATABASE_URL`, `MAPBOX_SECRET_TOKEN`, `OPENWEATHER_API_KEY`
-   - `CLIENT_URL` = your Vercel URL (e.g. `https://urban-route-intelligence-system.vercel.app`)
-4. Test: `https://your-service.onrender.com/health`
-
-### Vercel (frontend)
-
-1. Import this repo; set root directory to `client`.
-2. Set environment variables in the Vercel dashboard:
-   - `VITE_MAPBOX_PUBLIC_TOKEN` = Mapbox public token (`pk.…`)
-   - `VITE_API_URL` = `https://your-service.onrender.com/api`
-3. Redeploy after env vars are set.
-
-### GitHub Actions secrets (CI)
-
-Add `VITE_MAPBOX_PUBLIC_TOKEN` and `VITE_API_URL` under **Settings → Secrets → Actions**.
-
-## API keys & security
-
-| Secret | Where it lives | In git? | In browser? |
-|--------|----------------|---------|-------------|
-| `MAPBOX_SECRET_TOKEN` (`sk.…`) | Render env only | **No** | **No** |
-| `OPENWEATHER_API_KEY` | Render env only | **No** | **No** |
-| `DATABASE_URL` | Render env only | **No** | **No** |
-| `VITE_MAPBOX_PUBLIC_TOKEN` (`pk.…`) | Vercel env | **No** | **Yes** (required for map tiles) |
-
-`.env` and `.env.local` are gitignored. Only placeholder `.env.example` files are committed.
-
-The Mapbox **public** token (`pk.…`) is visible in the deployed frontend bundle — that is expected. Restrict it by URL in the [Mapbox dashboard](https://account.mapbox.com/access-tokens/). Never put `sk.…` or database URLs in client code or committed files.
-
-## Health Check
-
-- Backend: `GET /health` → `{ "status": "ok", "ts": "..." }`
-
-## Progress
-
-- [x] Phase 0 — repo, CI, deploy skeleton
-- [x] Phase 1 — map, search, Mapbox routes, fast/safe UI (risk placeholder)
-- [ ] Phase 2 — synthetic incidents, ML risk grid, heatmap
-
-## Data Honesty
-
-- **Weather:** real (OpenWeatherMap)
-- **Incidents:** synthetic seed data + user reports (see `DATA_METHODOLOGY.md` in Phase 2)

@@ -7,6 +7,9 @@ export function useRoutes(source, destination) {
   const [safeId, setSafeId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [trigger, setTrigger] = useState(0);
+
+  const refetch = () => setTrigger(t => t + 1);
 
   useEffect(() => {
     if (!source || !destination) {
@@ -46,7 +49,7 @@ export function useRoutes(source, destination) {
     return () => {
       cancelled = true;
     };
-  }, [source, destination]);
+  }, [source, destination, trigger]);
 
-  return { routes, fastId, safeId, loading, error };
+  return { routes, fastId, safeId, loading, error, refetch };
 }

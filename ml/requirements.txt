@@ -1,0 +1,10 @@
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.5.1
+shapely==2.0.4
+psycopg2-binary==2.9.9
+joblib==1.4.2
+python-dotenv==1.0.1
+matplotlib==3.9.0
+# h3 installed separately via: pip install h3==3.7.6 --only-binary=:all:
+# Do NOT add h3 here — the wheel must be installed before this file runs

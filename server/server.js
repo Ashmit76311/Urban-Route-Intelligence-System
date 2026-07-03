@@ -7,8 +7,15 @@ const path = require('path');
 
 const navigateRouter = require('./routes/navigate');
 const geocodeRouter = require('./routes/geocode');
+const riskRouter = require('./routes/risk');
+const incidentRouter = require('./routes/incidents');
+const helmet = require('helmet');
 
 const app = express();
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
 
 app.use(cors({
   origin(origin, callback) {
@@ -26,6 +33,8 @@ app.use(express.json());
 
 app.use('/api', navigateRouter);
 app.use('/api', geocodeRouter);
+app.use('/api', riskRouter);
+app.use('/api', incidentRouter);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));
 
@@ -50,14 +59,17 @@ async function runStartupMigration() {
     console.log("✅ PostGIS extension checked/enabled.");
     
     // 2. Read and run migration file
-    const migrationPath = path.join(__dirname, 'db', 'migrations', '001_initial.sql');
-    if (fs.existsSync(migrationPath)) {
-      const sql = fs.readFileSync(migrationPath, 'utf8');
+    const migrationPath1 = path.join(__dirname, 'db', 'migrations', '001_initial.sql');
+    if (fs.existsSync(migrationPath1)) {
+      const sql = fs.readFileSync(migrationPath1, 'utf8');
       await client.query(sql);
-      console.log("✅ Database schema migration successfully applied!");
-    } else {
-      console.log(`⚠️ Migration file not found at ${migrationPath}`);
     }
+    const migrationPath2 = path.join(__dirname, 'db', 'migrations', '002_add_baseline.sql');
+    if (fs.existsSync(migrationPath2)) {
+      const sql = fs.readFileSync(migrationPath2, 'utf8');
+      await client.query(sql);
+    }
+    console.log("✅ Database schema migrations successfully applied!");
   } catch (err) {
     console.error("❌ Startup migration failed:", err.message);
   } finally {
