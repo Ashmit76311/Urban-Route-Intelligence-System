@@ -47,12 +47,12 @@ Standard navigation apps (Google Maps, Apple Maps) optimize for time and distanc
 └──────┬──────┘
        │
 ┌──────▼──────────────────────┐
-│  PostgreSQL + PostGIS        │  Render
+│  PostgreSQL + PostGIS       │  Render
 │  risk_grid (H3 hex cells)   │
 │  incidents                  │
 │  weather_cache              │
 │  routes_log                 │
-└──────────────────────────────┘
+└─────────────────────────────┘
 
 Offline (setup only):
 Python → scikit-learn RF → precomputed risk grid → seeded into DB
