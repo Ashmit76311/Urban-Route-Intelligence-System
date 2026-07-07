@@ -1,18 +1,17 @@
 # URIS — Urban Risk Intelligence System
 
-> Safety-aware navigation for Delhi NCR — recommends routes based on dynamic risk scoring, not just travel time.
+An AI-powered navigation platform that recommends safer city routes using
+dynamic risk assessment — built as a solo full-stack portfolio project.
 
-**[Live Demo](https://your-vercel-url.vercel.app)** · **[Data Methodology](ml/DATA_METHODOLOGY.md)**
-
----
-
-## The Problem
-
-Standard navigation apps (Google Maps, Apple Maps) optimize for time and distance. They don't account for safety — crime-prone areas, accident black spots, or zones that become risky after dark. URIS adds a risk dimension to route planning.
-
----
+**Live demo:** [your-vercel-url.vercel.app](https://your-vercel-url.vercel.app)
 
 ## What It Does
+- Generates Fastest and Safest route alternatives between any two points in Delhi NCR
+- Scores routes using a pre-trained Random Forest model (R² = 0.93, MAE = 4.5 pts)
+- Visualizes risk as a color-coded H3 hexagonal heatmap
+- Adjusts risk scores in real time based on current weather conditions
+- Tracks live location during navigation and warns when entering high-risk zones
+- Accepts user incident reports that immediately update the risk heatmap
 
 | Feature | Detail |
 |---|---|
@@ -104,121 +103,41 @@ For each route alternative:
 ---
 
 ## Local Setup
-
-**Prerequisites:** Node.js 20+, Python 3.11+, PostgreSQL with PostGIS, psql in PATH
-
 ```bash
-git clone https://github.com/Ashmit76311/uris.git
-cd uris
-```
+# Backend
+cd server && npm install
+cp .env.example .env   # fill in your keys
+npm run dev
 
-**Backend:**
-```bash
-cd server
-npm install
-cp .env.example .env        # fill in DATABASE_URL, MAPBOX_SECRET_TOKEN,
-                             # OPENWEATHER_API_KEY, ADMIN_TOKEN
-npm run dev                  # http://localhost:3001
-```
-
-**Frontend:**
-```bash
-cd client
-npm install
+# Frontend
+cd client && npm install
 cp .env.local.example .env.local   # fill in VITE_MAPBOX_PUBLIC_TOKEN
-npm run dev                         # http://localhost:5173
-```
+npm run dev
 
-**ML pipeline (first-time only — seeds the risk grid into DB):**
-```bash
+# ML pipeline (first-time setup only)
 cd ml
-python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate    # Mac/Linux
-
-pip install h3==3.7.6 --only-binary=:all:   # h3 first — needs pre-built wheel
+python -m venv venv && venv/Scripts/activate
+pip install h3==3.7.6 --only-binary=:all:
 pip install -r requirements.txt
-
-python generate_data.py        # → data/incidents.csv
-python train_model.py          # → models/risk_model.joblib  (prints R² + MAE)
-python compute_grid.py         # → data/risk_grid.csv
-python seed_db.py              # → seeds PostgreSQL
+python generate_data.py
+python train_model.py
+python compute_grid.py
+python seed_db.py
 ```
 
-**Verify DB is seeded:**
-```bash
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM risk_grid;"
-# Expected: 700–900 rows
+## Data Methodology
+Incident data is synthetic — see [ml/DATA_METHODOLOGY.md](ml/DATA_METHODOLOGY.md)
+for full explanation of what the model does and does not represent.
+
+## Architecture
 ```
-
----
-
-## API Reference
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/routes?src_lng=&src_lat=&dst_lng=&dst_lat=` | Fetch + score route alternatives |
-| `GET` | `/api/geocode?q=` | Place search (proxied Mapbox, India-biased) |
-| `GET` | `/api/risk/grid?sw_lat=&sw_lng=&ne_lat=&ne_lng=` | GeoJSON hex cells in viewport |
-| `POST` | `/api/incidents` | Submit incident report |
-| `POST` | `/api/risk/reset` | Reset grid to baseline (requires `x-admin-token` header) |
-| `GET` | `/health` | Health check |
-
----
-
-## Security
-
-- Mapbox secret token and OpenWeatherMap key are never client-side — all third-party calls proxied through the backend
-- Mapbox public (`pk.`) token is domain-restricted in the Mapbox dashboard
-- `helmet` HTTP security headers on all responses
-- Incident submissions: rate-limited (5/hour/IP), bounding-box validated, note length capped at 280 chars, HTML stripped
-- HTTPS enforced via Vercel + Render (free TLS)
-
----
-
-## Demo Reset
-
-If incident reports have raised cell scores before a demo:
-
-```bash
-curl -X POST https://your-render-url.onrender.com/api/risk/reset \
-  -H "x-admin-token: your_admin_token"
+React + Mapbox GL JS
+        ↓ HTTPS/REST
+Node.js + Express
+   ↓              ↓
+Mapbox        OpenWeatherMap
+Directions        (real)
+   ↓
+PostgreSQL + PostGIS
+(H3 risk grid — precomputed by Random Forest)
 ```
-
-Resets all `risk_score` values to `baseline_score` (the original model output).
-
----
-
-## Project Structure
-
-```
-uris/
-├── client/                  # React frontend
-│   └── src/
-│       ├── components/      # Map, SearchBar, RoutePanel, NavigationStrip, IncidentModal
-│       └── hooks/           # useGeolocation, useRoutes, useRouteLines,
-│                            # useHeatmap, useLiveLocation, useNavigation
-├── server/                  # Node.js + Express backend
-│   ├── routes/              # geocode, navigate, risk, incidents
-│   ├── middleware/          # rateLimit
-│   └── db/                  # pg pool, migrations
-└── ml/                      # Python ML pipeline
-    ├── generate_data.py
-    ├── train_model.py
-    ├── compute_grid.py
-    ├── seed_db.py
-    └── DATA_METHODOLOGY.md  # honest explanation of synthetic data
-```
-
----
-
-## Known Constraints
-
-- Risk grid is precomputed, not live — new user incident reports bump cell scores immediately via a heuristic (+4–8 pts), but the underlying RF model is not retrained at runtime
-- Step advancement threshold is 30m — works on mobile GPS, unreliable on desktop Wi-Fi geolocation
-- Incident data is synthetic and calibrated to Delhi NCR only; the bounding box check in `/api/incidents` rejects coordinates outside this region
-- Render free tier spins down after 15 min inactivity — first request after cold start is slower
-
----
-
-*Built by [Ashmit Kumar Srivastav](https://github.com/Ashmit76311)*
