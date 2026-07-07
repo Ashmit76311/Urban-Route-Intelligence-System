@@ -3,7 +3,7 @@
 An AI-powered navigation platform that recommends safer city routes using
 dynamic risk assessment — built as a solo full-stack portfolio project.
 
-**Live demo:** [your-vercel-url.vercel.app](https://your-vercel-url.vercel.app)
+**Live demo:** https://urban-route-intelligence-system.vercel.app/
 
 ## What It Does
 - Generates Fastest and Safest route alternatives between any two points in Delhi NCR
@@ -141,3 +141,7 @@ Directions        (real)
 PostgreSQL + PostGIS
 (H3 risk grid — precomputed by Random Forest)
 ```
+## 👤 Author
+
+**Ashmit Kumar Srivastav**
+- GitHub: [@Ashmit76311](https://github.com/Ashmit76311)
