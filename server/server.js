@@ -54,6 +54,9 @@ async function runStartupMigration() {
   try {
     await client.connect();
     
+    // Supabase installs PostGIS in 'tiger' schema
+    await client.query("SET search_path TO public, tiger, extensions;");
+    
     // 1. Enable PostGIS
     await client.query(`CREATE EXTENSION IF NOT EXISTS postgis;`);
     console.log("✅ PostGIS extension checked/enabled.");

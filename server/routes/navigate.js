@@ -60,45 +60,50 @@ async function getWeatherSeverity(lat, lng) {
 // Returns null if no grid cells matched.
 // ---------------------------------------------------------------
 async function scoreRoute(geometry) {
-  const waypoints = sampleWaypoints(geometry);
-  const lngs = waypoints.map(w => w[0]);
-  const lats  = waypoints.map(w => w[1]);
+  try {
+    const waypoints = sampleWaypoints(geometry);
+    const lngs = waypoints.map(w => w[0]);
+    const lats  = waypoints.map(w => w[1]);
 
-  const result = await db.query(`
-    SELECT
-      wp.idx,
-      rg.risk_score
-    FROM UNNEST($1::float[], $2::float[]) WITH ORDINALITY AS wp(lng, lat, idx)
-    LEFT JOIN LATERAL (
-      SELECT risk_score
-      FROM risk_grid
-      WHERE ST_DWithin(
-        cell,
-        ST_SetSRID(ST_MakePoint(wp.lng, wp.lat), 4326)::geography,
-        1000
-      )
-      ORDER BY ST_Distance(
-        cell,
-        ST_SetSRID(ST_MakePoint(wp.lng, wp.lat), 4326)::geography
-      )
-      LIMIT 1
-    ) rg ON true
-    ORDER BY wp.idx
-  `, [lngs, lats]);
+    const result = await db.query(`
+      SELECT
+        wp.idx,
+        rg.risk_score
+      FROM UNNEST($1::float[], $2::float[]) WITH ORDINALITY AS wp(lng, lat, idx)
+      LEFT JOIN LATERAL (
+        SELECT risk_score
+        FROM risk_grid
+        WHERE ST_DWithin(
+          cell,
+          ST_SetSRID(ST_MakePoint(wp.lng, wp.lat), 4326)::geography,
+          1000
+        )
+        ORDER BY ST_Distance(
+          cell,
+          ST_SetSRID(ST_MakePoint(wp.lng, wp.lat), 4326)::geography
+        )
+        LIMIT 1
+      ) rg ON true
+      ORDER BY wp.idx
+    `, [lngs, lats]);
 
-  const scores = result.rows
-    .filter(r => r.risk_score !== null)
-    .map(r => parseFloat(r.risk_score));
+    const scores = result.rows
+      .filter(r => r.risk_score !== null)
+      .map(r => parseFloat(r.risk_score));
 
-  if (!scores.length) return null;
+    if (!scores.length) return null;
 
-  const sorted = [...scores].sort((a, b) => b - a);
-  // Top 30% worst cells (peak-weighted: dangerous corridors matter more)
-  const top30  = sorted.slice(0, Math.max(1, Math.ceil(scores.length * 0.3)));
-  const avg    = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const peak   = top30.reduce((a, b) => a + b, 0) / top30.length;
-  // Weight peak more heavily so routes through high-risk clusters score noticeably higher
-  return Math.round(avg * 0.4 + peak * 0.6);
+    const sorted = [...scores].sort((a, b) => b - a);
+    // Top 30% worst cells (peak-weighted: dangerous corridors matter more)
+    const top30  = sorted.slice(0, Math.max(1, Math.ceil(scores.length * 0.3)));
+    const avg    = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const peak   = top30.reduce((a, b) => a + b, 0) / top30.length;
+    // Weight peak more heavily so routes through high-risk clusters score noticeably higher
+    return Math.round(avg * 0.4 + peak * 0.6);
+  } catch (err) {
+    console.warn('[scoreRoute] DB unavailable, skipping risk scoring:', err.message);
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------
@@ -220,7 +225,7 @@ router.get('/routes', routeLimiter, async (req, res) => {
 
     res.json({ routes, fast_id, safe_id });
   } catch (err) {
-    console.error('[routes]', err.message);
+    console.error('[routes]', err.message, err.response?.status, err.response?.data);
     res.status(502).json({ error: 'Route fetch failed' });
   }
 });
